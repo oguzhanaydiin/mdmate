@@ -22,6 +22,11 @@ constexpr int IDC_EDITOR = 101;
 constexpr int IDC_PREVIEW = 102;
 constexpr int IDC_STATUS = 103;
 
+constexpr wchar_t kSplitterClassName[] = L"MDMateSplitterClass";
+constexpr int kSplitterWidth = 6;
+constexpr double kMinSplitRatio = 0.15;
+constexpr double kMaxSplitRatio = 0.85;
+
 constexpr UINT_PTR kPreviewTimerId = 1;
 constexpr UINT kPreviewDelayMs = 120;
 
@@ -32,12 +37,16 @@ constexpr int IDM_FILE_SAVE_AS = 40004;
 constexpr int IDM_FILE_EXIT = 40005;
 constexpr int IDM_VIEW_TOGGLE_PREVIEW = 40101;
 constexpr int IDM_VIEW_FULLSCREEN = 40102;
+constexpr int IDM_VIEW_THEME_LIGHT = 40103;
+constexpr int IDM_VIEW_THEME_DARK = 40104;
+constexpr int IDM_VIEW_THEME_PIXEL = 40105;
 constexpr int IDM_HELP_ABOUT = 40201;
 
 HINSTANCE g_instance = nullptr;
 HWND g_mainWindow = nullptr;
 HWND g_editor = nullptr;
 HWND g_preview = nullptr;
+HWND g_splitter = nullptr;
 HWND g_status = nullptr;
 HFONT g_editorFont = nullptr;
 HFONT g_previewFont = nullptr;
@@ -48,9 +57,15 @@ bool g_isDirty = false;
 bool g_showPreview = true;
 bool g_suppressEditorChange = false;
 bool g_isFullscreen = false;
+bool g_isDraggingSplitter = false;
+double g_splitRatio = 0.58;
+int g_contentHeight = 0;
 WINDOWPLACEMENT g_windowPlacement{sizeof(WINDOWPLACEMENT)};
 DWORD g_windowStyle = 0;
 DWORD g_windowExStyle = 0;
+
+enum class AppTheme { Light, Dark, Pixel };
+AppTheme g_theme = AppTheme::Light;
 
 std::wstring TrimLeft(std::wstring_view text) {
     size_t i = 0;
@@ -757,6 +772,144 @@ PreviewDocument RenderMarkdownPreview(const std::wstring& markdown) {
     return doc;
 }
 
+struct ThemeColors {
+    COLORREF editorBackground;
+    COLORREF editorText;
+    COLORREF previewBackground;
+    COLORREF body;
+    COLORREF heading[6];
+    COLORREF quote;
+    COLORREF code;
+    COLORREF list;
+    COLORREF rule;
+    COLORREF link;
+    COLORREF inlineCode;
+};
+
+constexpr ThemeColors kLightTheme{
+    RGB(255, 255, 255),
+    RGB(20, 20, 20),
+    RGB(255, 255, 255),
+    RGB(30, 30, 30),
+    {RGB(15, 15, 15), RGB(20, 20, 20), RGB(28, 28, 28), RGB(35, 35, 35), RGB(45, 45, 45), RGB(55, 55, 55)},
+    RGB(95, 95, 95),
+    RGB(120, 40, 100),
+    RGB(30, 30, 30),
+    RGB(150, 150, 150),
+    RGB(20, 90, 200),
+    RGB(170, 40, 110),
+};
+
+constexpr ThemeColors kDarkTheme{
+    RGB(30, 30, 30),
+    RGB(225, 225, 225),
+    RGB(30, 30, 30),
+    RGB(215, 215, 215),
+    {RGB(255, 255, 255), RGB(240, 240, 240), RGB(225, 225, 225), RGB(210, 210, 210), RGB(195, 195, 195),
+     RGB(180, 180, 180)},
+    RGB(170, 170, 170),
+    RGB(230, 150, 80),
+    RGB(210, 210, 210),
+    RGB(110, 110, 110),
+    RGB(110, 170, 255),
+    RGB(240, 150, 190),
+};
+
+constexpr ThemeColors kPixelTheme{
+    RGB(210, 206, 197),
+    RGB(40, 38, 35),
+    RGB(210, 206, 197),
+    RGB(50, 48, 45),
+    {RGB(25, 60, 95), RGB(30, 70, 108), RGB(35, 80, 120), RGB(45, 90, 130), RGB(55, 100, 138), RGB(65, 108, 145)},
+    RGB(120, 108, 92),
+    RGB(165, 75, 20),
+    RGB(50, 48, 45),
+    RGB(160, 152, 138),
+    RGB(40, 105, 165),
+    RGB(180, 95, 30),
+};
+
+const ThemeColors& CurrentTheme() {
+    switch (g_theme) {
+        case AppTheme::Dark:
+            return kDarkTheme;
+        case AppTheme::Pixel:
+            return kPixelTheme;
+        default:
+            return kLightTheme;
+    }
+}
+
+void LayoutControls(HWND window);
+
+LRESULT CALLBACK SplitterWndProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
+    switch (message) {
+        case WM_LBUTTONDOWN:
+            SetCapture(window);
+            g_isDraggingSplitter = true;
+            return 0;
+
+        case WM_LBUTTONUP:
+            if (g_isDraggingSplitter) {
+                g_isDraggingSplitter = false;
+                ReleaseCapture();
+                if (g_mainWindow != nullptr) {
+                    LayoutControls(g_mainWindow);
+                }
+            }
+            return 0;
+
+        case WM_CAPTURECHANGED:
+            if (g_isDraggingSplitter) {
+                g_isDraggingSplitter = false;
+                if (g_mainWindow != nullptr) {
+                    LayoutControls(g_mainWindow);
+                }
+            }
+            return 0;
+
+        case WM_MOUSEMOVE:
+            if (g_isDraggingSplitter && g_mainWindow != nullptr) {
+                POINT cursor{};
+                GetCursorPos(&cursor);
+                ScreenToClient(g_mainWindow, &cursor);
+
+                RECT client{};
+                GetClientRect(g_mainWindow, &client);
+                const int width = client.right - client.left;
+                if (width > 0) {
+                    const double ratio = static_cast<double>(cursor.x) / static_cast<double>(width);
+                    g_splitRatio = std::clamp(ratio, kMinSplitRatio, kMaxSplitRatio);
+
+                    // Only slide the lightweight bar while dragging; reflowing the
+                    // (rich edit) editor/preview panes on every move causes visible
+                    // stutter and ghosting, so that heavier layout happens on release.
+                    const int editorWidth =
+                        std::clamp(static_cast<int>(width * g_splitRatio), 0, std::max(0, width - kSplitterWidth));
+                    MoveWindow(window, editorWidth, 0, kSplitterWidth, g_contentHeight, TRUE);
+                }
+            }
+            return 0;
+
+        case WM_SETCURSOR:
+            SetCursor(LoadCursorW(nullptr, IDC_SIZEWE));
+            return TRUE;
+
+        case WM_ERASEBKGND: {
+            RECT rect{};
+            GetClientRect(window, &rect);
+            HBRUSH brush = CreateSolidBrush(CurrentTheme().rule);
+            FillRect(reinterpret_cast<HDC>(wParam), &rect, brush);
+            DeleteObject(brush);
+            return 1;
+        }
+
+        default:
+            break;
+    }
+    return DefWindowProcW(window, message, wParam, lParam);
+}
+
 CHARFORMAT2W BuildCharFormat(const wchar_t* faceName, LONG pointSizeTwips, COLORREF color, bool bold = false) {
     CHARFORMAT2W format{};
     format.cbSize = sizeof(format);
@@ -769,37 +922,39 @@ CHARFORMAT2W BuildCharFormat(const wchar_t* faceName, LONG pointSizeTwips, COLOR
 }
 
 CHARFORMAT2W ResolveBlockFormat(const PreviewSpan& span) {
+    const ThemeColors& theme = CurrentTheme();
     switch (span.type) {
         case PreviewBlockType::Heading:
             switch (span.headingLevel) {
                 case 1:
-                    return BuildCharFormat(L"Segoe UI", 400, RGB(15, 15, 15), true);
+                    return BuildCharFormat(L"Segoe UI", 400, theme.heading[0], true);
                 case 2:
-                    return BuildCharFormat(L"Segoe UI", 340, RGB(20, 20, 20), true);
+                    return BuildCharFormat(L"Segoe UI", 340, theme.heading[1], true);
                 case 3:
-                    return BuildCharFormat(L"Segoe UI", 300, RGB(28, 28, 28), true);
+                    return BuildCharFormat(L"Segoe UI", 300, theme.heading[2], true);
                 case 4:
-                    return BuildCharFormat(L"Segoe UI", 260, RGB(35, 35, 35), true);
+                    return BuildCharFormat(L"Segoe UI", 260, theme.heading[3], true);
                 case 5:
-                    return BuildCharFormat(L"Segoe UI", 240, RGB(45, 45, 45), true);
+                    return BuildCharFormat(L"Segoe UI", 240, theme.heading[4], true);
                 default:
-                    return BuildCharFormat(L"Segoe UI", 220, RGB(55, 55, 55), true);
+                    return BuildCharFormat(L"Segoe UI", 220, theme.heading[5], true);
             }
         case PreviewBlockType::Quote:
-            return BuildCharFormat(L"Segoe UI", 220, RGB(95, 95, 95));
+            return BuildCharFormat(L"Segoe UI", 220, theme.quote);
         case PreviewBlockType::Code:
-            return BuildCharFormat(L"Consolas", 210, RGB(120, 40, 100));
+            return BuildCharFormat(L"Consolas", 210, theme.code);
         case PreviewBlockType::List:
-            return BuildCharFormat(L"Segoe UI", 220, RGB(30, 30, 30));
+            return BuildCharFormat(L"Segoe UI", 220, theme.list);
         case PreviewBlockType::Rule:
-            return BuildCharFormat(L"Segoe UI", 220, RGB(150, 150, 150));
+            return BuildCharFormat(L"Segoe UI", 220, theme.rule);
         case PreviewBlockType::Paragraph:
         default:
-            return BuildCharFormat(L"Segoe UI", 220, RGB(30, 30, 30));
+            return BuildCharFormat(L"Segoe UI", 220, theme.body);
     }
 }
 
 CHARFORMAT2W ResolveInlineOverlay(const PreviewInlineSpan& span) {
+    const ThemeColors& theme = CurrentTheme();
     CHARFORMAT2W format{};
     format.cbSize = sizeof(format);
     format.dwMask = CFM_BOLD | CFM_ITALIC | CFM_STRIKEOUT;
@@ -808,12 +963,12 @@ CHARFORMAT2W ResolveInlineOverlay(const PreviewInlineSpan& span) {
 
     if (span.code) {
         format.dwMask |= CFM_FACE | CFM_COLOR;
-        format.crTextColor = RGB(170, 40, 110);
+        format.crTextColor = theme.inlineCode;
         wcsncpy_s(format.szFaceName, L"Consolas", _TRUNCATE);
     } else if (span.link) {
         format.dwMask |= CFM_COLOR | CFM_UNDERLINE;
         format.dwEffects |= CFE_UNDERLINE;
-        format.crTextColor = RGB(20, 90, 200);
+        format.crTextColor = theme.link;
     }
 
     return format;
@@ -827,7 +982,7 @@ void ApplyPreviewStyles(const PreviewDocument& doc) {
 
     SetControlText(g_preview, doc.text);
 
-    CHARFORMAT2W body = BuildCharFormat(L"Segoe UI", 220, RGB(30, 30, 30));
+    CHARFORMAT2W body = BuildCharFormat(L"Segoe UI", 220, CurrentTheme().body);
     CHARRANGE allRange{};
     allRange.cpMin = 0;
     allRange.cpMax = -1;
@@ -856,6 +1011,27 @@ void ApplyPreviewStyles(const PreviewDocument& doc) {
 
     SendMessageW(g_preview, EM_EXSETSEL, 0, reinterpret_cast<LPARAM>(&previousSelection));
     SendMessageW(g_preview, WM_SETREDRAW, TRUE, 0);
+    InvalidateRect(g_preview, nullptr, TRUE);
+}
+
+void ApplyEditorTheme() {
+    const ThemeColors& theme = CurrentTheme();
+
+    SendMessageW(g_editor, EM_SETBKGNDCOLOR, 0, theme.editorBackground);
+    SendMessageW(g_preview, EM_SETBKGNDCOLOR, 0, theme.previewBackground);
+
+    CHARFORMAT2W editorFormat{};
+    editorFormat.cbSize = sizeof(editorFormat);
+    editorFormat.dwMask = CFM_COLOR;
+    editorFormat.crTextColor = theme.editorText;
+
+    CHARRANGE allRange{};
+    allRange.cpMin = 0;
+    allRange.cpMax = -1;
+    SendMessageW(g_editor, EM_EXSETSEL, 0, reinterpret_cast<LPARAM>(&allRange));
+    SendMessageW(g_editor, EM_SETCHARFORMAT, SCF_ALL, reinterpret_cast<LPARAM>(&editorFormat));
+
+    InvalidateRect(g_editor, nullptr, TRUE);
     InvalidateRect(g_preview, nullptr, TRUE);
 }
 
@@ -935,15 +1111,27 @@ void LayoutControls(HWND window) {
     const int width = static_cast<int>(client.right - client.left);
     const int height = static_cast<int>(client.bottom - client.top);
     const int contentHeight = std::max(0, height - statusHeight);
+    g_contentHeight = contentHeight;
+
+    HDWP layout = BeginDeferWindowPos(g_showPreview ? 3 : 2);
 
     if (g_showPreview) {
-        const int editorWidth = (width * 58) / 100;
-        MoveWindow(g_editor, 0, 0, editorWidth, contentHeight, TRUE);
-        MoveWindow(g_preview, editorWidth + 1, 0, width - editorWidth - 1, contentHeight, TRUE);
+        const int editorWidth = std::clamp(static_cast<int>(width * g_splitRatio), 0, std::max(0, width - kSplitterWidth));
+        layout = DeferWindowPos(layout, g_editor, nullptr, 0, 0, editorWidth, contentHeight, SWP_NOZORDER);
+        layout = DeferWindowPos(layout, g_splitter, nullptr, editorWidth, 0, kSplitterWidth, contentHeight,
+                                 SWP_NOZORDER);
+        layout = DeferWindowPos(layout, g_preview, nullptr, editorWidth + kSplitterWidth, 0,
+                                 width - editorWidth - kSplitterWidth, contentHeight, SWP_NOZORDER);
+        ShowWindow(g_splitter, SW_SHOW);
         ShowWindow(g_preview, SW_SHOW);
     } else {
-        MoveWindow(g_editor, 0, 0, width, contentHeight, TRUE);
+        layout = DeferWindowPos(layout, g_editor, nullptr, 0, 0, width, contentHeight, SWP_NOZORDER);
+        ShowWindow(g_splitter, SW_HIDE);
         ShowWindow(g_preview, SW_HIDE);
+    }
+
+    if (layout != nullptr) {
+        EndDeferWindowPos(layout);
     }
 
     MoveWindow(g_status, 0, contentHeight, width, statusHeight, TRUE);
@@ -1109,6 +1297,7 @@ HMENU BuildMainMenu() {
     HMENU mainMenu = CreateMenu();
     HMENU fileMenu = CreatePopupMenu();
     HMENU viewMenu = CreatePopupMenu();
+    HMENU themeMenu = CreatePopupMenu();
     HMENU helpMenu = CreatePopupMenu();
 
     AppendMenuW(fileMenu, MF_STRING, IDM_FILE_NEW, L"&New\tCtrl+N");
@@ -1118,8 +1307,17 @@ HMENU BuildMainMenu() {
     AppendMenuW(fileMenu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(fileMenu, MF_STRING, IDM_FILE_EXIT, L"E&xit\tAlt+F4");
 
+    AppendMenuW(themeMenu, MF_STRING | (g_theme == AppTheme::Light ? MF_CHECKED : MF_UNCHECKED), IDM_VIEW_THEME_LIGHT,
+                L"&Light");
+    AppendMenuW(themeMenu, MF_STRING | (g_theme == AppTheme::Dark ? MF_CHECKED : MF_UNCHECKED), IDM_VIEW_THEME_DARK,
+                L"&Dark");
+    AppendMenuW(themeMenu, MF_STRING | (g_theme == AppTheme::Pixel ? MF_CHECKED : MF_UNCHECKED),
+                IDM_VIEW_THEME_PIXEL, L"&Pixel");
+
     AppendMenuW(viewMenu, MF_STRING, IDM_VIEW_TOGGLE_PREVIEW, L"Toggle &Preview\tF6");
     AppendMenuW(viewMenu, MF_STRING, IDM_VIEW_FULLSCREEN, L"&Fullscreen\tF11");
+    AppendMenuW(viewMenu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(viewMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(themeMenu), L"&Theme");
 
     AppendMenuW(helpMenu, MF_STRING, IDM_HELP_ABOUT, L"&About");
 
@@ -1152,6 +1350,9 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
                 0, 0, 0, 0, window, reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_PREVIEW)), g_instance,
                 nullptr);
 
+            g_splitter = CreateWindowExW(0, kSplitterClassName, L"", WS_CHILD | WS_VISIBLE, 0, 0, 0, 0, window,
+                                         nullptr, g_instance, nullptr);
+
             g_status = CreateWindowExW(0, STATUSCLASSNAMEW, L"", WS_CHILD | WS_VISIBLE, 0, 0, 0, 0, window,
                                        reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_STATUS)), g_instance,
                                        nullptr);
@@ -1170,6 +1371,8 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             SendMessageW(g_editor, EM_SETLIMITTEXT, 0, 0);
             SendMessageW(g_preview, EM_SETLIMITTEXT, 0, 0);
             SendMessageW(g_editor, EM_SETEVENTMASK, 0, ENM_CHANGE);
+
+            ApplyEditorTheme();
 
             DragAcceptFiles(window, TRUE);
 
@@ -1241,6 +1444,28 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
                 case IDM_VIEW_FULLSCREEN:
                     ToggleFullscreen(window);
                     return 0;
+                case IDM_VIEW_THEME_LIGHT:
+                case IDM_VIEW_THEME_DARK:
+                case IDM_VIEW_THEME_PIXEL: {
+                    if (id == IDM_VIEW_THEME_DARK) {
+                        g_theme = AppTheme::Dark;
+                    } else if (id == IDM_VIEW_THEME_PIXEL) {
+                        g_theme = AppTheme::Pixel;
+                    } else {
+                        g_theme = AppTheme::Light;
+                    }
+                    ApplyEditorTheme();
+                    RefreshPreview();
+
+                    HMENU menu = GetMenu(window);
+                    CheckMenuItem(menu, IDM_VIEW_THEME_LIGHT,
+                                  MF_BYCOMMAND | (g_theme == AppTheme::Light ? MF_CHECKED : MF_UNCHECKED));
+                    CheckMenuItem(menu, IDM_VIEW_THEME_DARK,
+                                  MF_BYCOMMAND | (g_theme == AppTheme::Dark ? MF_CHECKED : MF_UNCHECKED));
+                    CheckMenuItem(menu, IDM_VIEW_THEME_PIXEL,
+                                  MF_BYCOMMAND | (g_theme == AppTheme::Pixel ? MF_CHECKED : MF_UNCHECKED));
+                    return 0;
+                }
                 case IDM_HELP_ABOUT:
                     MessageBoxW(window,
                                 L"MDMate\nA native, ultra-lightweight Markdown editor for Windows.\n\n"
@@ -1315,6 +1540,17 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int commandShow) {
     windowClass.lpszClassName = kWindowClassName;
 
     if (!RegisterClassExW(&windowClass)) {
+        return 1;
+    }
+
+    WNDCLASSEXW splitterClass{};
+    splitterClass.cbSize = sizeof(splitterClass);
+    splitterClass.lpfnWndProc = SplitterWndProc;
+    splitterClass.hInstance = instance;
+    splitterClass.hCursor = LoadCursorW(nullptr, IDC_SIZEWE);
+    splitterClass.lpszClassName = kSplitterClassName;
+
+    if (!RegisterClassExW(&splitterClass)) {
         return 1;
     }
 
