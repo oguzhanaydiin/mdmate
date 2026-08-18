@@ -1,0 +1,27 @@
+# Build output
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.sdf
+*.opensdf
+*.VC.db
+*.VC.opendb
+
+# MSBuild / linker intermediates
+*.ilk
+*.pdb
+*.exp
+*.lib
+*.obj
+*.iobj
+*.ipdb
+*.tlog
+*.log
+
+# Editor/OS junk
+Thumbs.db
+desktop.ini
