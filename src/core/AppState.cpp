@@ -1,5 +1,7 @@
 #include "AppState.h"
 
+#include "Constants.h"
+
 namespace mdmate {
 
 HINSTANCE g_instance = nullptr;
@@ -8,6 +10,8 @@ HWND g_editor = nullptr;
 HWND g_preview = nullptr;
 HWND g_splitter = nullptr;
 HWND g_status = nullptr;
+HWND g_fileTree = nullptr;
+HWND g_fileTreeSplitter = nullptr;
 HFONT g_editorFont = nullptr;
 HFONT g_previewFont = nullptr;
 HACCEL g_accelerators = nullptr;
@@ -25,5 +29,10 @@ DWORD g_windowExStyle = 0;
 bool g_isDraggingSplitter = false;
 double g_splitRatio = 0.58;
 int g_contentHeight = 0;
+
+bool g_isDraggingFileTreeSplitter = false;
+int g_fileTreeWidth = kDefaultFileTreeWidth;
+bool g_showFileTree = false;
+std::wstring g_currentFolderPath;
 
 }

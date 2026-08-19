@@ -1,5 +1,7 @@
 #include <windows.h>
 
+#include <ole2.h>
+
 #include <iterator>
 
 #include "core/AppState.h"
@@ -11,6 +13,8 @@ using namespace mdmate;
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int commandShow) {
     g_instance = instance;
+
+    OleInitialize(nullptr);
 
     HMODULE user32 = GetModuleHandleW(L"user32.dll");
     if (user32 != nullptr) {
@@ -48,6 +52,17 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int commandShow) {
         return 1;
     }
 
+    WNDCLASSEXW fileTreeSplitterClass{};
+    fileTreeSplitterClass.cbSize = sizeof(fileTreeSplitterClass);
+    fileTreeSplitterClass.lpfnWndProc = FileTreeSplitterWndProc;
+    fileTreeSplitterClass.hInstance = instance;
+    fileTreeSplitterClass.hCursor = LoadCursorW(nullptr, IDC_SIZEWE);
+    fileTreeSplitterClass.lpszClassName = kFileTreeSplitterClassName;
+
+    if (!RegisterClassExW(&fileTreeSplitterClass)) {
+        return 1;
+    }
+
     g_mainWindow = CreateWindowExW(0, kWindowClassName, kAppTitle,
                                    WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN,
                                    CW_USEDEFAULT, CW_USEDEFAULT, 1300, 840,
@@ -60,8 +75,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int commandShow) {
     ACCEL accelerators[] = {
         {FVIRTKEY | FCONTROL, 'N', IDM_FILE_NEW},
         {FVIRTKEY | FCONTROL, 'O', IDM_FILE_OPEN},
+        {FVIRTKEY | FCONTROL, 'K', IDM_FILE_OPEN_FOLDER},
         {FVIRTKEY | FCONTROL, 'S', IDM_FILE_SAVE},
         {FVIRTKEY | FCONTROL | FSHIFT, 'S', IDM_FILE_SAVE_AS},
+        {FVIRTKEY | FCONTROL, 'B', IDM_VIEW_TOGGLE_EXPLORER},
         {FVIRTKEY, VK_F6, IDM_VIEW_TOGGLE_PREVIEW},
         {FVIRTKEY, VK_F11, IDM_VIEW_FULLSCREEN},
     };
@@ -82,6 +99,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int commandShow) {
         DestroyAcceleratorTable(g_accelerators);
         g_accelerators = nullptr;
     }
+
+    OleUninitialize();
 
     return static_cast<int>(message.wParam);
 }
