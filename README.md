@@ -12,6 +12,7 @@ Super lightweight, Windows-native Markdown editor inspired by Ghostwriter.
 
 - Fast Markdown editing with a distraction-free native UI
 - Side-by-side lightweight preview (plain rendered markdown)
+- Light, Dark, and Pixel themes (`View > Theme`)
 - UTF-8 save/load support for `.md` and `.markdown`
 - Word, character, and line counters in status bar
 - Drag and drop files into the app
