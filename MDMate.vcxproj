@@ -99,6 +99,32 @@
 
   <ItemGroup>
     <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\core\AppState.cpp" />
+    <ClCompile Include="src\core\StringUtils.cpp" />
+    <ClCompile Include="src\core\FileIO.cpp" />
+    <ClCompile Include="src\markdown\InlineParser.cpp" />
+    <ClCompile Include="src\markdown\BlockParser.cpp" />
+    <ClCompile Include="src\markdown\PreviewDocument.cpp" />
+    <ClCompile Include="src\ui\Theme.cpp" />
+    <ClCompile Include="src\ui\Splitter.cpp" />
+    <ClCompile Include="src\ui\PreviewRenderer.cpp" />
+    <ClCompile Include="src\ui\DocumentActions.cpp" />
+    <ClCompile Include="src\ui\MainWindow.cpp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ClInclude Include="src\core\Constants.h" />
+    <ClInclude Include="src\core\AppState.h" />
+    <ClInclude Include="src\core\StringUtils.h" />
+    <ClInclude Include="src\core\FileIO.h" />
+    <ClInclude Include="src\markdown\InlineParser.h" />
+    <ClInclude Include="src\markdown\BlockParser.h" />
+    <ClInclude Include="src\markdown\PreviewDocument.h" />
+    <ClInclude Include="src\ui\Theme.h" />
+    <ClInclude Include="src\ui\Splitter.h" />
+    <ClInclude Include="src\ui\PreviewRenderer.h" />
+    <ClInclude Include="src\ui\DocumentActions.h" />
+    <ClInclude Include="src\ui\MainWindow.h" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

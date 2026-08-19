@@ -5,10 +5,103 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;c++;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Source Files\core">
+      <UniqueIdentifier>{1a1b2b3a-0001-4a1a-9a1a-000000000001}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\markdown">
+      <UniqueIdentifier>{1a1b2b3a-0001-4a1a-9a1a-000000000002}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\ui">
+      <UniqueIdentifier>{1a1b2b3a-0001-4a1a-9a1a-000000000003}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\core">
+      <UniqueIdentifier>{1a1b2b3a-0002-4a1a-9a1a-000000000001}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\markdown">
+      <UniqueIdentifier>{1a1b2b3a-0002-4a1a-9a1a-000000000002}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\ui">
+      <UniqueIdentifier>{1a1b2b3a-0002-4a1a-9a1a-000000000003}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\core\AppState.cpp">
+      <Filter>Source Files\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\StringUtils.cpp">
+      <Filter>Source Files\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\core\FileIO.cpp">
+      <Filter>Source Files\core</Filter>
+    </ClCompile>
+    <ClCompile Include="src\markdown\InlineParser.cpp">
+      <Filter>Source Files\markdown</Filter>
+    </ClCompile>
+    <ClCompile Include="src\markdown\BlockParser.cpp">
+      <Filter>Source Files\markdown</Filter>
+    </ClCompile>
+    <ClCompile Include="src\markdown\PreviewDocument.cpp">
+      <Filter>Source Files\markdown</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\Theme.cpp">
+      <Filter>Source Files\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\Splitter.cpp">
+      <Filter>Source Files\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\PreviewRenderer.cpp">
+      <Filter>Source Files\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\DocumentActions.cpp">
+      <Filter>Source Files\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ui\MainWindow.cpp">
+      <Filter>Source Files\ui</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\core\Constants.h">
+      <Filter>Header Files\core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\AppState.h">
+      <Filter>Header Files\core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\StringUtils.h">
+      <Filter>Header Files\core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\FileIO.h">
+      <Filter>Header Files\core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\markdown\InlineParser.h">
+      <Filter>Header Files\markdown</Filter>
+    </ClInclude>
+    <ClInclude Include="src\markdown\BlockParser.h">
+      <Filter>Header Files\markdown</Filter>
+    </ClInclude>
+    <ClInclude Include="src\markdown\PreviewDocument.h">
+      <Filter>Header Files\markdown</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\Theme.h">
+      <Filter>Header Files\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\Splitter.h">
+      <Filter>Header Files\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\PreviewRenderer.h">
+      <Filter>Header Files\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\DocumentActions.h">
+      <Filter>Header Files\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\MainWindow.h">
+      <Filter>Header Files\ui</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
