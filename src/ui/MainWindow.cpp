@@ -14,6 +14,7 @@
 #include "../core/StringUtils.h"
 #include "../markdown/PreviewDocument.h"
 #include "DocumentActions.h"
+#include "FileExplorer.h"
 #include "PreviewRenderer.h"
 #include "Theme.h"
 
@@ -101,19 +102,38 @@ void LayoutControls(HWND window) {
     const int contentHeight = std::max(0, height - statusHeight);
     g_contentHeight = contentHeight;
 
-    HDWP layout = BeginDeferWindowPos(g_showPreview ? 3 : 2);
+    const int controlCount = (g_showFileTree ? 2 : 0) + (g_showPreview ? 3 : 2);
+    HDWP layout = BeginDeferWindowPos(controlCount);
+
+    int leftOffset = 0;
+    if (g_showFileTree) {
+        const int treeWidth = std::clamp(g_fileTreeWidth, 0, std::max(0, width - kSplitterWidth));
+        layout = DeferWindowPos(layout, g_fileTree, nullptr, 0, 0, treeWidth, contentHeight, SWP_NOZORDER);
+        layout = DeferWindowPos(layout, g_fileTreeSplitter, nullptr, treeWidth, 0, kSplitterWidth, contentHeight,
+                                 SWP_NOZORDER);
+        ShowWindow(g_fileTree, SW_SHOW);
+        ShowWindow(g_fileTreeSplitter, SW_SHOW);
+        leftOffset = treeWidth + kSplitterWidth;
+    } else {
+        ShowWindow(g_fileTree, SW_HIDE);
+        ShowWindow(g_fileTreeSplitter, SW_HIDE);
+    }
+
+    const int remainingWidth = std::max(0, width - leftOffset);
 
     if (g_showPreview) {
-        const int editorWidth = std::clamp(static_cast<int>(width * g_splitRatio), 0, std::max(0, width - kSplitterWidth));
-        layout = DeferWindowPos(layout, g_editor, nullptr, 0, 0, editorWidth, contentHeight, SWP_NOZORDER);
-        layout = DeferWindowPos(layout, g_splitter, nullptr, editorWidth, 0, kSplitterWidth, contentHeight,
-                                 SWP_NOZORDER);
-        layout = DeferWindowPos(layout, g_preview, nullptr, editorWidth + kSplitterWidth, 0,
-                                 width - editorWidth - kSplitterWidth, contentHeight, SWP_NOZORDER);
+        const int editorWidth =
+            std::clamp(static_cast<int>(remainingWidth * g_splitRatio), 0, std::max(0, remainingWidth - kSplitterWidth));
+        layout = DeferWindowPos(layout, g_editor, nullptr, leftOffset, 0, editorWidth, contentHeight, SWP_NOZORDER);
+        layout = DeferWindowPos(layout, g_splitter, nullptr, leftOffset + editorWidth, 0, kSplitterWidth,
+                                 contentHeight, SWP_NOZORDER);
+        layout = DeferWindowPos(layout, g_preview, nullptr, leftOffset + editorWidth + kSplitterWidth, 0,
+                                 remainingWidth - editorWidth - kSplitterWidth, contentHeight, SWP_NOZORDER);
         ShowWindow(g_splitter, SW_SHOW);
         ShowWindow(g_preview, SW_SHOW);
     } else {
-        layout = DeferWindowPos(layout, g_editor, nullptr, 0, 0, width, contentHeight, SWP_NOZORDER);
+        layout = DeferWindowPos(layout, g_editor, nullptr, leftOffset, 0, remainingWidth, contentHeight,
+                                 SWP_NOZORDER);
         ShowWindow(g_splitter, SW_HIDE);
         ShowWindow(g_preview, SW_HIDE);
     }
@@ -160,6 +180,7 @@ HMENU BuildMainMenu() {
 
     AppendMenuW(fileMenu, MF_STRING, IDM_FILE_NEW, L"&New\tCtrl+N");
     AppendMenuW(fileMenu, MF_STRING, IDM_FILE_OPEN, L"&Open...\tCtrl+O");
+    AppendMenuW(fileMenu, MF_STRING, IDM_FILE_OPEN_FOLDER, L"Open &Folder...\tCtrl+K");
     AppendMenuW(fileMenu, MF_STRING, IDM_FILE_SAVE, L"&Save\tCtrl+S");
     AppendMenuW(fileMenu, MF_STRING, IDM_FILE_SAVE_AS, L"Save &As...\tCtrl+Shift+S");
     AppendMenuW(fileMenu, MF_SEPARATOR, 0, nullptr);
@@ -173,6 +194,8 @@ HMENU BuildMainMenu() {
                 IDM_VIEW_THEME_PIXEL, L"&Pixel");
 
     AppendMenuW(viewMenu, MF_STRING, IDM_VIEW_TOGGLE_PREVIEW, L"Toggle &Preview\tF6");
+    AppendMenuW(viewMenu, MF_STRING | (g_showFileTree ? MF_CHECKED : MF_UNCHECKED), IDM_VIEW_TOGGLE_EXPLORER,
+                L"Toggle &Explorer\tCtrl+B");
     AppendMenuW(viewMenu, MF_STRING, IDM_VIEW_FULLSCREEN, L"&Fullscreen\tF11");
     AppendMenuW(viewMenu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(viewMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(themeMenu), L"&Theme");
@@ -210,6 +233,11 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
 
             g_splitter = CreateWindowExW(0, kSplitterClassName, L"", WS_CHILD | WS_VISIBLE, 0, 0, 0, 0, window,
                                          nullptr, g_instance, nullptr);
+
+            g_fileTreeSplitter = CreateWindowExW(0, kFileTreeSplitterClassName, L"", WS_CHILD, 0, 0, 0, 0, window,
+                                                 nullptr, g_instance, nullptr);
+
+            CreateFileExplorer(window);
 
             g_status = CreateWindowExW(0, STATUSCLASSNAMEW, L"", WS_CHILD | WS_VISIBLE, 0, 0, 0, 0, window,
                                        reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_STATUS)), g_instance,
@@ -283,6 +311,9 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
                 case IDM_FILE_OPEN:
                     OpenDocument(window);
                     return 0;
+                case IDM_FILE_OPEN_FOLDER:
+                    OpenFolder(window);
+                    return 0;
                 case IDM_FILE_SAVE:
                     SaveDocument(window, false);
                     return 0;
@@ -302,6 +333,15 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
                 case IDM_VIEW_FULLSCREEN:
                     ToggleFullscreen(window);
                     return 0;
+                case IDM_VIEW_TOGGLE_EXPLORER: {
+                    g_showFileTree = !g_showFileTree;
+                    LayoutControls(window);
+
+                    HMENU menu = GetMenu(window);
+                    CheckMenuItem(menu, IDM_VIEW_TOGGLE_EXPLORER,
+                                  MF_BYCOMMAND | (g_showFileTree ? MF_CHECKED : MF_UNCHECKED));
+                    return 0;
+                }
                 case IDM_VIEW_THEME_LIGHT:
                 case IDM_VIEW_THEME_DARK:
                 case IDM_VIEW_THEME_PIXEL: {
@@ -314,6 +354,8 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
                     }
                     ApplyEditorTheme();
                     RefreshPreview();
+
+                    ApplyFileExplorerTheme();
 
                     HMENU menu = GetMenu(window);
                     CheckMenuItem(menu, IDM_VIEW_THEME_LIGHT,
@@ -342,6 +384,10 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             const NMHDR* hdr = reinterpret_cast<const NMHDR*>(lParam);
             if (hdr != nullptr && hdr->idFrom == IDC_EDITOR && hdr->code == EN_CHANGE) {
                 OnEditorChanged(window);
+                return 0;
+            }
+            if (hdr != nullptr && hdr->idFrom == IDC_FILETREE) {
+                HandleFileExplorerNotify(window, lParam);
                 return 0;
             }
             break;
