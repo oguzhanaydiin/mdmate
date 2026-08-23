@@ -12,8 +12,12 @@ HWND g_splitter = nullptr;
 HWND g_status = nullptr;
 HWND g_fileTree = nullptr;
 HWND g_fileTreeSplitter = nullptr;
+HWND g_explorerToggleButton = nullptr;
+HWND g_openFolderButton = nullptr;
 HFONT g_editorFont = nullptr;
 HFONT g_previewFont = nullptr;
+HFONT g_uiFont = nullptr;
+HFONT g_iconFont = nullptr;
 HACCEL g_accelerators = nullptr;
 
 std::wstring g_currentFilePath;
@@ -28,11 +32,12 @@ DWORD g_windowExStyle = 0;
 
 bool g_isDraggingSplitter = false;
 double g_splitRatio = 0.58;
+int g_contentTop = 0;
 int g_contentHeight = 0;
 
 bool g_isDraggingFileTreeSplitter = false;
 int g_fileTreeWidth = kDefaultFileTreeWidth;
-bool g_showFileTree = false;
+bool g_showFileTree = true;
 std::wstring g_currentFolderPath;
 
 }
