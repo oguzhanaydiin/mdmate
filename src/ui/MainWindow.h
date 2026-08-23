@@ -17,6 +17,4 @@ void QueuePreviewRefresh(HWND window);
 void OnEditorChanged(HWND window);
 void ToggleFullscreen(HWND window);
 
-HMENU BuildMainMenu();
-
 }

@@ -31,10 +31,10 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int commandShow) {
     windowClass.style = CS_HREDRAW | CS_VREDRAW;
     windowClass.lpfnWndProc = WindowProc;
     windowClass.hInstance = instance;
-    windowClass.hCursor = LoadCursorW(nullptr, IDC_IBEAM);
+    windowClass.hCursor = LoadCursorW(nullptr, IDC_ARROW);
     windowClass.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
     windowClass.hIconSm = LoadIconW(nullptr, IDI_APPLICATION);
-    windowClass.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
+    windowClass.hbrBackground = nullptr;
     windowClass.lpszClassName = kWindowClassName;
 
     if (!RegisterClassExW(&windowClass)) {
