@@ -9,11 +9,58 @@
 
 namespace mdmate {
 
+namespace {
+
+HWND g_hoveredSplitter = nullptr;
+
+void TrackSplitterHover(HWND window) {
+    if (g_hoveredSplitter != window) {
+        g_hoveredSplitter = window;
+        InvalidateRect(window, nullptr, TRUE);
+    }
+
+    TRACKMOUSEEVENT tracking{};
+    tracking.cbSize = sizeof(tracking);
+    tracking.dwFlags = TME_LEAVE;
+    tracking.hwndTrack = window;
+    TrackMouseEvent(&tracking);
+}
+
+void ClearSplitterHover(HWND window) {
+    if (g_hoveredSplitter == window) {
+        g_hoveredSplitter = nullptr;
+        InvalidateRect(window, nullptr, TRUE);
+    }
+}
+
+void PaintSplitterBackground(HWND window, HDC dc) {
+    RECT rect{};
+    GetClientRect(window, &rect);
+    const ThemeColors& theme = CurrentTheme();
+
+    // Opaque fill in the content gap; glass only belongs in the DWM-extended chrome.
+    HBRUSH baseBrush = CreateSolidBrush(theme.editorBackground);
+    FillRect(dc, &rect, baseBrush);
+    DeleteObject(baseBrush);
+
+    const bool active = (window == g_hoveredSplitter);
+    const int lineWidth = active ? 2 : 1;
+    RECT line = rect;
+    line.left = (rect.left + rect.right - lineWidth) / 2;
+    line.right = line.left + lineWidth;
+    HBRUSH lineBrush = CreateSolidBrush(active ? theme.splitterHover : theme.rule);
+    FillRect(dc, &line, lineBrush);
+    DeleteObject(lineBrush);
+}
+
+}
+
 LRESULT CALLBACK SplitterWndProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
     switch (message) {
         case WM_LBUTTONDOWN:
             SetCapture(window);
             g_isDraggingSplitter = true;
+            TrackSplitterHover(window);
             return 0;
 
         case WM_LBUTTONUP:
@@ -36,6 +83,7 @@ LRESULT CALLBACK SplitterWndProc(HWND window, UINT message, WPARAM wParam, LPARA
             return 0;
 
         case WM_MOUSEMOVE:
+            TrackSplitterHover(window);
             if (g_isDraggingSplitter && g_mainWindow != nullptr) {
                 POINT cursor{};
                 GetCursorPos(&cursor);
@@ -51,23 +99,22 @@ LRESULT CALLBACK SplitterWndProc(HWND window, UINT message, WPARAM wParam, LPARA
                     // Defer pane reflow until the drag ends to avoid Rich Edit redraw cost.
                     const int editorWidth =
                         std::clamp(static_cast<int>(width * g_splitRatio), 0, std::max(0, width - kSplitterWidth));
-                    MoveWindow(window, editorWidth, 0, kSplitterWidth, g_contentHeight, TRUE);
+                    MoveWindow(window, editorWidth, g_contentTop, kSplitterWidth, g_contentHeight, TRUE);
                 }
             }
+            return 0;
+
+        case WM_MOUSELEAVE:
+            ClearSplitterHover(window);
             return 0;
 
         case WM_SETCURSOR:
             SetCursor(LoadCursorW(nullptr, IDC_SIZEWE));
             return TRUE;
 
-        case WM_ERASEBKGND: {
-            RECT rect{};
-            GetClientRect(window, &rect);
-            HBRUSH brush = CreateSolidBrush(CurrentTheme().rule);
-            FillRect(reinterpret_cast<HDC>(wParam), &rect, brush);
-            DeleteObject(brush);
+        case WM_ERASEBKGND:
+            PaintSplitterBackground(window, reinterpret_cast<HDC>(wParam));
             return 1;
-        }
 
         default:
             break;
@@ -80,6 +127,7 @@ LRESULT CALLBACK FileTreeSplitterWndProc(HWND window, UINT message, WPARAM wPara
         case WM_LBUTTONDOWN:
             SetCapture(window);
             g_isDraggingFileTreeSplitter = true;
+            TrackSplitterHover(window);
             return 0;
 
         case WM_LBUTTONUP:
@@ -102,6 +150,7 @@ LRESULT CALLBACK FileTreeSplitterWndProc(HWND window, UINT message, WPARAM wPara
             return 0;
 
         case WM_MOUSEMOVE:
+            TrackSplitterHover(window);
             if (g_isDraggingFileTreeSplitter && g_mainWindow != nullptr) {
                 POINT cursor{};
                 GetCursorPos(&cursor);
@@ -115,22 +164,21 @@ LRESULT CALLBACK FileTreeSplitterWndProc(HWND window, UINT message, WPARAM wPara
                     std::clamp(static_cast<int>(cursor.x), kMinFileTreeWidth, std::min(kMaxFileTreeWidth, maxWidth));
 
                 // Defer pane reflow until the drag ends to avoid Rich Edit redraw cost.
-                MoveWindow(window, g_fileTreeWidth, 0, kSplitterWidth, g_contentHeight, TRUE);
+                MoveWindow(window, g_fileTreeWidth, g_contentTop, kSplitterWidth, g_contentHeight, TRUE);
             }
+            return 0;
+
+        case WM_MOUSELEAVE:
+            ClearSplitterHover(window);
             return 0;
 
         case WM_SETCURSOR:
             SetCursor(LoadCursorW(nullptr, IDC_SIZEWE));
             return TRUE;
 
-        case WM_ERASEBKGND: {
-            RECT rect{};
-            GetClientRect(window, &rect);
-            HBRUSH brush = CreateSolidBrush(CurrentTheme().rule);
-            FillRect(reinterpret_cast<HDC>(wParam), &rect, brush);
-            DeleteObject(brush);
+        case WM_ERASEBKGND:
+            PaintSplitterBackground(window, reinterpret_cast<HDC>(wParam));
             return 1;
-        }
 
         default:
             break;
