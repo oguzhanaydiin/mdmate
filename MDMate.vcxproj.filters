@@ -41,6 +41,9 @@
     <ClCompile Include="src\core\FileIO.cpp">
       <Filter>Source Files\core</Filter>
     </ClCompile>
+    <ClCompile Include="src\core\Session.cpp">
+      <Filter>Source Files\core</Filter>
+    </ClCompile>
     <ClCompile Include="src\markdown\InlineParser.cpp">
       <Filter>Source Files\markdown</Filter>
     </ClCompile>
@@ -80,6 +83,9 @@
       <Filter>Header Files\core</Filter>
     </ClInclude>
     <ClInclude Include="src\core\FileIO.h">
+      <Filter>Header Files\core</Filter>
+    </ClInclude>
+    <ClInclude Include="src\core\Session.h">
       <Filter>Header Files\core</Filter>
     </ClInclude>
     <ClInclude Include="src\markdown\InlineParser.h">
