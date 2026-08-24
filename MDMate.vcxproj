@@ -102,6 +102,7 @@
     <ClCompile Include="src\core\AppState.cpp" />
     <ClCompile Include="src\core\StringUtils.cpp" />
     <ClCompile Include="src\core\FileIO.cpp" />
+    <ClCompile Include="src\core\Session.cpp" />
     <ClCompile Include="src\markdown\InlineParser.cpp" />
     <ClCompile Include="src\markdown\BlockParser.cpp" />
     <ClCompile Include="src\markdown\PreviewDocument.cpp" />
@@ -118,6 +119,7 @@
     <ClInclude Include="src\core\AppState.h" />
     <ClInclude Include="src\core\StringUtils.h" />
     <ClInclude Include="src\core\FileIO.h" />
+    <ClInclude Include="src\core\Session.h" />
     <ClInclude Include="src\markdown\InlineParser.h" />
     <ClInclude Include="src\markdown\BlockParser.h" />
     <ClInclude Include="src\markdown\PreviewDocument.h" />

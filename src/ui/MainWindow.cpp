@@ -13,6 +13,7 @@
 
 #include "../core/AppState.h"
 #include "../core/Constants.h"
+#include "../core/Session.h"
 #include "../core/StringUtils.h"
 #include "../markdown/PreviewDocument.h"
 #include "DocumentActions.h"
@@ -271,6 +272,34 @@ void PaintWindowChrome(HWND window, HDC dc) {
     DeleteObject(ruleBrush);
 }
 
+bool PathExists(const std::wstring& path, bool directory) {
+    if (path.empty()) {
+        return false;
+    }
+
+    const DWORD attributes = GetFileAttributesW(path.c_str());
+    if (attributes == INVALID_FILE_ATTRIBUTES) {
+        return false;
+    }
+
+    const bool isDirectory = (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+    return directory ? isDirectory : !isDirectory;
+}
+
+void RestoreLastSession(HWND window) {
+    const SessionPaths session = LoadSession();
+
+    if (PathExists(session.folder, true)) {
+        PopulateFileTree(session.folder);
+        g_showFileTree = true;
+        SyncMenuChecks();
+    }
+
+    if (PathExists(session.file, false)) {
+        LoadDocumentIntoEditor(window, session.file);
+    }
+}
+
 }
 
 void UpdateWindowTitle() {
@@ -482,6 +511,7 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             UpdateWindowTitle();
             UpdateStatusText();
             RefreshPreview();
+            RestoreLastSession(window);
             return 0;
         }
 
@@ -752,6 +782,7 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             if (!MaybeSavePendingChanges(window)) {
                 return 0;
             }
+            SaveSession();
             DestroyWindow(window);
             return 0;
 

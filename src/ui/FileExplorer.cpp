@@ -5,12 +5,14 @@
 #include <windowsx.h>
 
 #include <algorithm>
+#include <cwctype>
 #include <filesystem>
 #include <system_error>
 #include <vector>
 
 #include "../core/AppState.h"
 #include "../core/Constants.h"
+#include "../core/Session.h"
 #include "DocumentActions.h"
 #include "MainWindow.h"
 #include "Theme.h"
@@ -83,6 +85,11 @@ HTREEITEM InsertTreeNode(HTREEITEM parent, const std::filesystem::path& path, bo
     return TreeView_InsertItem(g_fileTree, &insert);
 }
 
+bool IsListedFile(const std::filesystem::path& path) {
+    const std::wstring ext = path.extension().wstring();
+    return _wcsicmp(ext.c_str(), L".md") == 0 || _wcsicmp(ext.c_str(), L".txt") == 0;
+}
+
 void PopulateChildren(HTREEITEM parent, const std::wstring& path) {
     std::vector<std::filesystem::directory_entry> dirs;
     std::vector<std::filesystem::directory_entry> files;
@@ -95,7 +102,7 @@ void PopulateChildren(HTREEITEM parent, const std::wstring& path) {
         std::error_code typeEc;
         if (entry.is_directory(typeEc)) {
             dirs.push_back(entry);
-        } else if (entry.is_regular_file(typeEc)) {
+        } else if (entry.is_regular_file(typeEc) && IsListedFile(entry.path())) {
             files.push_back(entry);
         }
     }
@@ -112,6 +119,55 @@ void PopulateChildren(HTREEITEM parent, const std::wstring& path) {
     for (const auto& file : files) {
         InsertTreeNode(parent, file.path(), false);
     }
+}
+
+std::wstring NormalizePath(std::wstring path) {
+    for (wchar_t& c : path) {
+        if (c == L'/') {
+            c = L'\\';
+        } else {
+            c = static_cast<wchar_t>(towlower(c));
+        }
+    }
+    while (path.size() > 3 && path.back() == L'\\') {
+        path.pop_back();
+    }
+    return path;
+}
+
+bool PathsEqual(const std::wstring& a, const std::wstring& b) {
+    return NormalizePath(a) == NormalizePath(b);
+}
+
+bool IsPathUnderFolder(const std::wstring& filePath, const std::wstring& folderPath) {
+    const std::wstring file = NormalizePath(filePath);
+    const std::wstring folder = NormalizePath(folderPath);
+    if (file.size() < folder.size()) {
+        return false;
+    }
+    if (file.compare(0, folder.size(), folder) != 0) {
+        return false;
+    }
+    return file.size() == folder.size() || file[folder.size()] == L'\\';
+}
+
+HTREEITEM FindChildByName(HTREEITEM parent, const std::wstring& name) {
+    for (HTREEITEM child = TreeView_GetChild(g_fileTree, parent); child != nullptr;
+         child = TreeView_GetNextSibling(g_fileTree, child)) {
+        TVITEMW item{};
+        item.mask = TVIF_PARAM;
+        item.hItem = child;
+        TreeView_GetItem(g_fileTree, &item);
+        const auto* data = reinterpret_cast<const NodeData*>(item.lParam);
+        if (data == nullptr) {
+            continue;
+        }
+        const std::wstring childName = std::filesystem::path(data->fullPath).filename().wstring();
+        if (_wcsicmp(childName.c_str(), name.c_str()) == 0) {
+            return child;
+        }
+    }
+    return nullptr;
 }
 
 }
@@ -195,6 +251,39 @@ void PopulateFileTree(const std::wstring& folderPath) {
         rootData->childrenLoaded = true;
     }
     TreeView_Expand(g_fileTree, rootItem, TVE_EXPAND);
+}
+
+void RevealPathInFileTree(const std::wstring& filePath) {
+    if (g_fileTree == nullptr || g_currentFolderPath.empty() || filePath.empty()) {
+        return;
+    }
+    if (!IsPathUnderFolder(filePath, g_currentFolderPath)) {
+        return;
+    }
+
+    const std::filesystem::path relative =
+        std::filesystem::path(NormalizePath(filePath)).lexically_relative(NormalizePath(g_currentFolderPath));
+    if (relative.empty() || relative == std::filesystem::path(L".") ||
+        (!relative.empty() && *relative.begin() == L"..")) {
+        return;
+    }
+
+    HTREEITEM item = TreeView_GetRoot(g_fileTree);
+    if (item == nullptr) {
+        return;
+    }
+
+    for (const auto& part : relative) {
+        TreeView_Expand(g_fileTree, item, TVE_EXPAND);
+        const HTREEITEM child = FindChildByName(item, part.wstring());
+        if (child == nullptr) {
+            return;
+        }
+        item = child;
+    }
+
+    TreeView_SelectItem(g_fileTree, item);
+    TreeView_EnsureVisible(g_fileTree, item);
 }
 
 void ApplyFileExplorerTheme() {
@@ -374,6 +463,9 @@ LRESULT HandleFileExplorerNotify(HWND window, LPARAM lParam) {
         const auto* sel = reinterpret_cast<const NMTREEVIEWW*>(lParam);
         auto* data = reinterpret_cast<NodeData*>(sel->itemNew.lParam);
         if (data != nullptr && !data->isDirectory) {
+            if (PathsEqual(data->fullPath, g_currentFilePath)) {
+                return 0;
+            }
             if (!MaybeSavePendingChanges(window)) {
                 return 0;
             }
@@ -411,6 +503,7 @@ void OpenFolder(HWND window) {
 
     PopulateFileTree(folder);
     g_showFileTree = true;
+    SaveSession();
     LayoutControls(window);
 }
 

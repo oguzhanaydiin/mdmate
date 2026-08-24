@@ -12,6 +12,9 @@ HWND CreateFileExplorer(HWND parent);
 // Populates the tree with the contents of a folder, replacing any prior contents.
 void PopulateFileTree(const std::wstring& folderPath);
 
+// Expands folders down to a file and selects it, if that file lives in the open folder.
+void RevealPathInFileTree(const std::wstring& filePath);
+
 // Applies the current theme's colors to the file tree.
 void ApplyFileExplorerTheme();
 void RecreateFileExplorerFonts(HWND owner);
