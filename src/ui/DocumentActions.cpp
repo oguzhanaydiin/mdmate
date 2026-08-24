@@ -5,7 +5,9 @@
 #include "../core/AppState.h"
 #include "../core/Constants.h"
 #include "../core/FileIO.h"
+#include "../core/Session.h"
 #include "../core/StringUtils.h"
+#include "FileExplorer.h"
 #include "MainWindow.h"
 
 namespace mdmate {
@@ -69,6 +71,7 @@ bool SaveDocument(HWND window, bool saveAs) {
     g_currentFilePath = targetPath;
     g_isDirty = false;
     SendMessageW(g_editor, EM_SETMODIFY, FALSE, 0);
+    SaveSession();
     UpdateWindowTitle();
     UpdateStatusText();
     return true;
@@ -104,10 +107,12 @@ bool LoadDocumentIntoEditor(HWND window, const std::wstring& path) {
     g_currentFilePath = path;
     g_isDirty = false;
     SendMessageW(g_editor, EM_SETMODIFY, FALSE, 0);
+    SaveSession();
 
     RefreshPreview();
     UpdateWindowTitle();
     UpdateStatusText();
+    RevealPathInFileTree(path);
     return true;
 }
 
@@ -123,6 +128,7 @@ void NewDocument(HWND window) {
     g_currentFilePath.clear();
     g_isDirty = false;
     SendMessageW(g_editor, EM_SETMODIFY, FALSE, 0);
+    SaveSession();
 
     RefreshPreview();
     UpdateWindowTitle();
