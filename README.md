@@ -1,18 +1,19 @@
 # MDMate
 
-Super lightweight, Windows-native Markdown editor inspired by Ghostwriter.
+Super lightweight, Windows 11–native Markdown editor inspired by Ghostwriter.
 
 ## Stack
 
 - C++20
 - Win32 API (native controls)
 - RichEdit (`Msftedit.dll`)
+- Windows 11 DWM (tinted title bar)
 
 ## Features
 
 - Fast Markdown editing with a distraction-free native UI
 - Side-by-side lightweight preview (plain rendered markdown)
-- Light, Dark, and Pixel themes (`View > Theme`)
+- Light and Dark themes with a Windows 11 title bar (`View > Theme`)
 - UTF-8 save/load support for `.md` and `.markdown`
 - Word, character, and line counters in status bar
 - Drag and drop files into the app

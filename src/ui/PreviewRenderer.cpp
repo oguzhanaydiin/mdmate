@@ -125,8 +125,10 @@ void ApplyEditorTheme() {
 
     CHARFORMAT2W editorFormat{};
     editorFormat.cbSize = sizeof(editorFormat);
-    editorFormat.dwMask = CFM_COLOR;
+    editorFormat.dwMask = CFM_COLOR | CFM_BACKCOLOR;
+    editorFormat.dwEffects = 0;
     editorFormat.crTextColor = theme.editorText;
+    editorFormat.crBackColor = theme.editorBackground;
 
     CHARRANGE allRange{};
     allRange.cpMin = 0;

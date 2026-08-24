@@ -14,8 +14,12 @@ extern HWND g_splitter;
 extern HWND g_status;
 extern HWND g_fileTree;
 extern HWND g_fileTreeSplitter;
+extern HWND g_explorerToggleButton;
+extern HWND g_openFolderButton;
 extern HFONT g_editorFont;
 extern HFONT g_previewFont;
+extern HFONT g_uiFont;
+extern HFONT g_iconFont;
 extern HACCEL g_accelerators;
 
 extern std::wstring g_currentFilePath;
@@ -30,6 +34,7 @@ extern DWORD g_windowExStyle;
 
 extern bool g_isDraggingSplitter;
 extern double g_splitRatio;
+extern int g_contentTop;
 extern int g_contentHeight;
 
 extern bool g_isDraggingFileTreeSplitter;

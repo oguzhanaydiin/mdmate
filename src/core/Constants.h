@@ -11,6 +11,12 @@ inline constexpr int IDC_EDITOR = 101;
 inline constexpr int IDC_PREVIEW = 102;
 inline constexpr int IDC_STATUS = 103;
 inline constexpr int IDC_FILETREE = 104;
+inline constexpr int IDC_TOGGLE_EXPLORER_BUTTON = 105;
+inline constexpr int IDC_OPEN_FOLDER_BUTTON = 106;
+
+inline constexpr int kToolbarHeight = 40;
+inline constexpr int kToggleButtonWidth = 32;
+inline constexpr int kOpenFolderButtonWidth = 110;
 
 inline constexpr wchar_t kSplitterClassName[] = L"MDMateSplitterClass";
 inline constexpr int kSplitterWidth = 6;
@@ -35,7 +41,6 @@ inline constexpr int IDM_VIEW_TOGGLE_PREVIEW = 40101;
 inline constexpr int IDM_VIEW_FULLSCREEN = 40102;
 inline constexpr int IDM_VIEW_THEME_LIGHT = 40103;
 inline constexpr int IDM_VIEW_THEME_DARK = 40104;
-inline constexpr int IDM_VIEW_THEME_PIXEL = 40105;
 inline constexpr int IDM_VIEW_TOGGLE_EXPLORER = 40106;
 inline constexpr int IDM_HELP_ABOUT = 40201;
 
