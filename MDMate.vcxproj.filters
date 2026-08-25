@@ -65,6 +65,9 @@
     <ClCompile Include="src\ui\DocumentActions.cpp">
       <Filter>Source Files\ui</Filter>
     </ClCompile>
+    <ClCompile Include="src\ui\Tabs.cpp">
+      <Filter>Source Files\ui</Filter>
+    </ClCompile>
     <ClCompile Include="src\ui\FileExplorer.cpp">
       <Filter>Source Files\ui</Filter>
     </ClCompile>
@@ -107,6 +110,9 @@
       <Filter>Header Files\ui</Filter>
     </ClInclude>
     <ClInclude Include="src\ui\DocumentActions.h">
+      <Filter>Header Files\ui</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ui\Tabs.h">
       <Filter>Header Files\ui</Filter>
     </ClInclude>
     <ClInclude Include="src\ui\FileExplorer.h">

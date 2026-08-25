@@ -110,6 +110,7 @@
     <ClCompile Include="src\ui\Splitter.cpp" />
     <ClCompile Include="src\ui\PreviewRenderer.cpp" />
     <ClCompile Include="src\ui\DocumentActions.cpp" />
+    <ClCompile Include="src\ui\Tabs.cpp" />
     <ClCompile Include="src\ui\FileExplorer.cpp" />
     <ClCompile Include="src\ui\MainWindow.cpp" />
   </ItemGroup>
@@ -127,6 +128,7 @@
     <ClInclude Include="src\ui\Splitter.h" />
     <ClInclude Include="src\ui\PreviewRenderer.h" />
     <ClInclude Include="src\ui\DocumentActions.h" />
+    <ClInclude Include="src\ui\Tabs.h" />
     <ClInclude Include="src\ui\FileExplorer.h" />
     <ClInclude Include="src\ui\MainWindow.h" />
   </ItemGroup>
