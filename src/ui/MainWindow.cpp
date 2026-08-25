@@ -19,6 +19,7 @@
 #include "DocumentActions.h"
 #include "FileExplorer.h"
 #include "PreviewRenderer.h"
+#include "Tabs.h"
 #include "Theme.h"
 
 namespace mdmate {
@@ -71,6 +72,28 @@ int ToolbarHeight(HWND window) {
 // Toolbar buttons sit flush left; the menu strip starts where they end.
 int ToolbarButtonsRight(HWND window) {
     return ScaleForWindow(window, 8 + kToggleButtonWidth + 6 + kOpenFolderButtonWidth);
+}
+
+void StrokeRoundRect(HDC dc, const RECT& rect, int radius, COLORREF color) {
+    HPEN pen = CreatePen(PS_SOLID, 1, color);
+    HGDIOBJ oldPen = SelectObject(dc, pen);
+    HGDIOBJ oldBrush = SelectObject(dc, GetStockObject(NULL_BRUSH));
+    RoundRect(dc, rect.left, rect.top, rect.right, rect.bottom, radius, radius);
+    SelectObject(dc, oldBrush);
+    SelectObject(dc, oldPen);
+    DeleteObject(pen);
+}
+
+void FillRoundRect(HDC dc, const RECT& rect, int radius, COLORREF color) {
+    HBRUSH brush = CreateSolidBrush(color);
+    HPEN pen = CreatePen(PS_SOLID, 1, CurrentTheme().rule);
+    HGDIOBJ oldBrush = SelectObject(dc, brush);
+    HGDIOBJ oldPen = SelectObject(dc, pen);
+    RoundRect(dc, rect.left, rect.top, rect.right, rect.bottom, radius, radius);
+    SelectObject(dc, oldBrush);
+    SelectObject(dc, oldPen);
+    DeleteObject(brush);
+    DeleteObject(pen);
 }
 
 LRESULT CALLBACK StatusSubclassProc(HWND status, UINT message, WPARAM wParam, LPARAM lParam, UINT_PTR subclassId,
@@ -149,6 +172,7 @@ void CreateAppMenus() {
     AppendMenuW(fileMenu, MF_STRING, IDM_FILE_OPEN_FOLDER, L"Open &Folder...\tCtrl+K");
     AppendMenuW(fileMenu, MF_STRING, IDM_FILE_SAVE, L"&Save\tCtrl+S");
     AppendMenuW(fileMenu, MF_STRING, IDM_FILE_SAVE_AS, L"Save &As...\tCtrl+Shift+S");
+    AppendMenuW(fileMenu, MF_STRING, IDM_FILE_CLOSE_TAB, L"Close &Tab\tCtrl+W");
     AppendMenuW(fileMenu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(fileMenu, MF_STRING, IDM_FILE_EXIT, L"E&xit\tAlt+F4");
 
@@ -226,10 +250,17 @@ void PaintWindowChrome(HWND window, HDC dc) {
     DeleteObject(background);
 
     RECT content = client;
-    content.top = toolbarH;
+    content.top = toolbarH + TabBarHeight(window);
     HBRUSH opaque = CreateSolidBrush(theme.editorBackground);
     FillRect(dc, &content, opaque);
     DeleteObject(opaque);
+
+    RECT toolbarRule = client;
+    toolbarRule.top = toolbarH - 1;
+    toolbarRule.bottom = toolbarH;
+    HBRUSH toolbarRuleBrush = CreateSolidBrush(theme.rule);
+    FillRect(dc, &toolbarRule, toolbarRuleBrush);
+    DeleteObject(toolbarRuleBrush);
 
     if (g_uiFont != nullptr) {
         SelectObject(dc, g_uiFont);
@@ -247,29 +278,18 @@ void PaintWindowChrome(HWND window, HDC dc) {
         RECT item{x, itemInset, x + measure.right + itemPad * 2, toolbarH - itemInset};
         g_titleMenus[i].rect = {item.left, 0, item.right, toolbarH};
 
+        const int radius = ScaleForWindow(window, 6);
         if (g_hotTitleMenu == i) {
-            HBRUSH hot = CreateSolidBrush(theme.menuHotBackground);
-            HPEN pen = CreatePen(PS_NULL, 0, RGB(0, 0, 0));
-            HGDIOBJ oldBrush = SelectObject(dc, hot);
-            HGDIOBJ oldPen = SelectObject(dc, pen);
-            const int radius = ScaleForWindow(window, 6);
-            RoundRect(dc, item.left, item.top, item.right, item.bottom, radius, radius);
-            SelectObject(dc, oldBrush);
-            SelectObject(dc, oldPen);
-            DeleteObject(hot);
-            DeleteObject(pen);
+            FillRoundRect(dc, item, radius, theme.menuHotBackground);
+        } else {
+            StrokeRoundRect(dc, item, radius, theme.rule);
         }
 
         DrawTextW(dc, g_titleMenus[i].label, -1, &item, DT_SINGLELINE | DT_CENTER | DT_VCENTER);
         x = item.right + ScaleForWindow(window, 2);
     }
 
-    RECT rule = client;
-    rule.top = toolbarH - 1;
-    rule.bottom = toolbarH;
-    HBRUSH ruleBrush = CreateSolidBrush(theme.rule);
-    FillRect(dc, &rule, ruleBrush);
-    DeleteObject(ruleBrush);
+    PaintTabBar(window, dc);
 }
 
 bool PathExists(const std::wstring& path, bool directory) {
@@ -295,15 +315,27 @@ void RestoreLastSession(HWND window) {
         SyncMenuChecks();
     }
 
-    if (PathExists(session.file, false)) {
-        LoadDocumentIntoEditor(window, session.file);
+    for (const std::wstring& file : session.files) {
+        if (PathExists(file, false)) {
+            OpenPathInTab(window, file);
+        }
+    }
+
+    if (!g_tabs.empty()) {
+        const int active = std::clamp(session.active, 0, static_cast<int>(g_tabs.size()) - 1);
+        ActivateTab(window, active);
     }
 }
 
 }
 
 void UpdateWindowTitle() {
-    std::wstring name = g_currentFilePath.empty() ? L"Untitled.md" : GetFileNameFromPath(g_currentFilePath);
+    if (g_tabs.empty()) {
+        SetWindowTextW(g_mainWindow, kAppTitle);
+        return;
+    }
+
+    std::wstring name = g_currentFilePath.empty() ? L"Untitled" : GetFileNameFromPath(g_currentFilePath);
     if (g_isDirty) {
         name += L" *";
     }
@@ -341,11 +373,30 @@ void QueuePreviewRefresh(HWND window) {
 }
 
 void OnEditorChanged(HWND window) {
-    if (!g_suppressEditorChange) {
-        g_isDirty = true;
-        UpdateWindowTitle();
-        QueuePreviewRefresh(window);
+    if (g_suppressEditorChange) {
+        return;
     }
+
+    const std::wstring text = ReadControlText(g_editor);
+    if (g_tabs.empty()) {
+        if (text.empty()) {
+            return;
+        }
+        DocumentTab tab{};
+        tab.text = text;
+        tab.dirty = true;
+        g_tabs.push_back(tab);
+        g_activeTab = 0;
+        InvalidateTabBar(window);
+    }
+
+    const bool wasDirty = g_isDirty;
+    g_isDirty = true;
+    if (!wasDirty) {
+        SyncActiveTabMeta();
+    }
+    UpdateWindowTitle();
+    QueuePreviewRefresh(window);
 }
 
 void LayoutControls(HWND window) {
@@ -360,13 +411,14 @@ void LayoutControls(HWND window) {
 
     const int width = static_cast<int>(client.right - client.left);
     const int height = static_cast<int>(client.bottom - client.top);
-    const int chromeH = ToolbarHeight(window);
+    const int toolbarH = ToolbarHeight(window);
+    const int chromeH = toolbarH + TabBarHeight(window);
     const int contentHeight = std::max(0, height - statusHeight - chromeH);
     g_contentTop = chromeH;
     g_contentHeight = contentHeight;
 
-    const int buttonHeight = chromeH - ScaleForWindow(window, 10);
-    const int buttonY = (chromeH - buttonHeight) / 2;
+    const int buttonHeight = toolbarH - ScaleForWindow(window, 10);
+    const int buttonY = (toolbarH - buttonHeight) / 2;
     const int toggleX = ScaleForWindow(window, 8);
     const int toggleWidth = ScaleForWindow(window, kToggleButtonWidth);
     MoveWindow(g_explorerToggleButton, toggleX, buttonY, toggleWidth, buttonHeight, TRUE);
@@ -499,7 +551,6 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
 
             SendMessageW(g_editor, EM_SETLIMITTEXT, 0, 0);
             SendMessageW(g_preview, EM_SETLIMITTEXT, 0, 0);
-            SendMessageW(g_editor, EM_SETEVENTMASK, 0, ENM_CHANGE);
 
             DragAcceptFiles(window, TRUE);
             CreateAppMenus();
@@ -507,17 +558,21 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             ApplyDarkScrollbar(g_editor);
             ApplyDarkScrollbar(g_preview);
             ApplyDarkScrollbar(g_fileTree);
+            g_suppressEditorChange = true;
             ApplyEditorTheme();
             UpdateWindowTitle();
             UpdateStatusText();
             RefreshPreview();
             RestoreLastSession(window);
+            g_suppressEditorChange = false;
+            SendMessageW(g_editor, EM_SETEVENTMASK, 0, ENM_CHANGE);
             return 0;
         }
 
         case WM_SIZE:
             LayoutControls(window);
             InvalidateToolbar(window);
+            InvalidateTabBar(window);
             return 0;
 
         case WM_DPICHANGED: {
@@ -528,6 +583,7 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             RecreateFileExplorerFonts(window);
             ApplyWindowChrome(window);
             LayoutControls(window);
+            InvalidateTabBar(window);
             return 0;
         }
 
@@ -555,6 +611,7 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
                 g_hotTitleMenu = hot;
                 InvalidateToolbar(window);
             }
+            HandleTabBarMouseMove(window, client);
 
             TRACKMOUSEEVENT tracking{};
             tracking.cbSize = sizeof(tracking);
@@ -569,6 +626,7 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
                 g_hotTitleMenu = -1;
                 InvalidateToolbar(window);
             }
+            HandleTabBarMouseLeave(window);
             return 0;
 
         case WM_LBUTTONDOWN: {
@@ -576,6 +634,17 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             const int menuIndex = HitTestTitleMenu(client);
             if (menuIndex >= 0) {
                 ShowTitleMenu(window, menuIndex);
+                return 0;
+            }
+            if (HandleTabBarClick(window, client)) {
+                return 0;
+            }
+            break;
+        }
+
+        case WM_MBUTTONDOWN: {
+            POINT client{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+            if (HandleTabBarMiddleClick(window, client)) {
                 return 0;
             }
             break;
@@ -627,18 +696,14 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
                 FillRect(drawItem->hDC, &drawItem->rcItem, background);
                 DeleteObject(background);
 
+                const int radius = ScaleForWindow(window, 6);
+                RECT frame = drawItem->rcItem;
+                frame.right = std::max(frame.left + 2, frame.right - 1);
+                frame.bottom = std::max(frame.top + 2, frame.bottom - 1);
                 if (pressed) {
-                    HBRUSH hot = CreateSolidBrush(theme.menuHotBackground);
-                    HPEN pen = CreatePen(PS_NULL, 0, RGB(0, 0, 0));
-                    HGDIOBJ oldBrush = SelectObject(drawItem->hDC, hot);
-                    HGDIOBJ oldPen = SelectObject(drawItem->hDC, pen);
-                    const int radius = ScaleForWindow(window, 6);
-                    RoundRect(drawItem->hDC, drawItem->rcItem.left, drawItem->rcItem.top, drawItem->rcItem.right,
-                              drawItem->rcItem.bottom, radius, radius);
-                    SelectObject(drawItem->hDC, oldBrush);
-                    SelectObject(drawItem->hDC, oldPen);
-                    DeleteObject(hot);
-                    DeleteObject(pen);
+                    FillRoundRect(drawItem->hDC, frame, radius, theme.menuHotBackground);
+                } else {
+                    StrokeRoundRect(drawItem->hDC, frame, radius, theme.rule);
                 }
 
                 wchar_t caption[64]{};
@@ -660,15 +725,10 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         }
 
         case WM_DROPFILES: {
-            if (!MaybeSavePendingChanges(window)) {
-                DragFinish(reinterpret_cast<HDROP>(wParam));
-                return 0;
-            }
-
             wchar_t path[MAX_PATH]{};
             DragQueryFileW(reinterpret_cast<HDROP>(wParam), 0, path, MAX_PATH);
             DragFinish(reinterpret_cast<HDROP>(wParam));
-            LoadDocumentIntoEditor(window, path);
+            OpenPathInTab(window, path);
             return 0;
         }
 
@@ -716,6 +776,15 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
                 case IDM_FILE_SAVE_AS:
                     SaveDocument(window, true);
                     return 0;
+                case IDM_FILE_CLOSE_TAB:
+                    CloseActiveTab(window);
+                    return 0;
+                case IDM_TAB_NEXT:
+                    NextTab(window);
+                    return 0;
+                case IDM_TAB_PREV:
+                    PrevTab(window);
+                    return 0;
                 case IDM_FILE_EXIT:
                     SendMessageW(window, WM_CLOSE, 0, 0);
                     return 0;
@@ -749,6 +818,7 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
                     InvalidateRect(g_explorerToggleButton, nullptr, TRUE);
                     InvalidateRect(g_openFolderButton, nullptr, TRUE);
                     InvalidateRect(window, nullptr, TRUE);
+                    InvalidateTabBar(window);
                     SyncMenuChecks();
                     return 0;
                 }
@@ -757,6 +827,7 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
                                 L"MDMate\nA native, ultra-lightweight Markdown editor for Windows.\n\n"
                                 L"Shortcuts:\n"
                                 L"Ctrl+N New\nCtrl+O Open\nCtrl+S Save\nCtrl+Shift+S Save As\n"
+                                L"Ctrl+W Close Tab\nCtrl+Tab Next Tab\n"
                                 L"F6 Toggle Preview\nF11 Fullscreen",
                                 kAppTitle, MB_OK | MB_ICONINFORMATION);
                     return 0;
@@ -779,9 +850,10 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
         }
 
         case WM_CLOSE:
-            if (!MaybeSavePendingChanges(window)) {
+            if (!MaybeSaveAllTabs(window)) {
                 return 0;
             }
+            CaptureActiveTab();
             SaveSession();
             DestroyWindow(window);
             return 0;
