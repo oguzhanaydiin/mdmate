@@ -15,6 +15,7 @@ inline constexpr int IDC_TOGGLE_EXPLORER_BUTTON = 105;
 inline constexpr int IDC_OPEN_FOLDER_BUTTON = 106;
 
 inline constexpr int kToolbarHeight = 40;
+inline constexpr int kTabBarHeight = 32;
 inline constexpr int kToggleButtonWidth = 32;
 inline constexpr int kOpenFolderButtonWidth = 110;
 
@@ -37,6 +38,9 @@ inline constexpr int IDM_FILE_SAVE = 40003;
 inline constexpr int IDM_FILE_SAVE_AS = 40004;
 inline constexpr int IDM_FILE_EXIT = 40005;
 inline constexpr int IDM_FILE_OPEN_FOLDER = 40006;
+inline constexpr int IDM_FILE_CLOSE_TAB = 40007;
+inline constexpr int IDM_TAB_NEXT = 40008;
+inline constexpr int IDM_TAB_PREV = 40009;
 inline constexpr int IDM_VIEW_TOGGLE_PREVIEW = 40101;
 inline constexpr int IDM_VIEW_FULLSCREEN = 40102;
 inline constexpr int IDM_VIEW_THEME_LIGHT = 40103;

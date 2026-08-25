@@ -9,6 +9,7 @@
 #include "../core/StringUtils.h"
 #include "FileExplorer.h"
 #include "MainWindow.h"
+#include "Tabs.h"
 
 namespace mdmate {
 
@@ -71,9 +72,11 @@ bool SaveDocument(HWND window, bool saveAs) {
     g_currentFilePath = targetPath;
     g_isDirty = false;
     SendMessageW(g_editor, EM_SETMODIFY, FALSE, 0);
+    CaptureActiveTab();
     SaveSession();
     UpdateWindowTitle();
     UpdateStatusText();
+    SyncActiveTabMeta();
     return true;
 }
 
@@ -107,42 +110,25 @@ bool LoadDocumentIntoEditor(HWND window, const std::wstring& path) {
     g_currentFilePath = path;
     g_isDirty = false;
     SendMessageW(g_editor, EM_SETMODIFY, FALSE, 0);
+    CaptureActiveTab();
     SaveSession();
 
     RefreshPreview();
     UpdateWindowTitle();
     UpdateStatusText();
     RevealPathInFileTree(path);
+    SyncActiveTabMeta();
     return true;
 }
 
 void NewDocument(HWND window) {
-    if (!MaybeSavePendingChanges(window)) {
-        return;
-    }
-
-    g_suppressEditorChange = true;
-    SetControlText(g_editor, L"");
-    g_suppressEditorChange = false;
-
-    g_currentFilePath.clear();
-    g_isDirty = false;
-    SendMessageW(g_editor, EM_SETMODIFY, FALSE, 0);
-    SaveSession();
-
-    RefreshPreview();
-    UpdateWindowTitle();
-    UpdateStatusText();
+    NewTab(window);
 }
 
 void OpenDocument(HWND window) {
-    if (!MaybeSavePendingChanges(window)) {
-        return;
-    }
-
     const std::wstring path = ShowOpenDialog(window);
     if (!path.empty()) {
-        LoadDocumentIntoEditor(window, path);
+        OpenPathInTab(window, path);
     }
 }
 

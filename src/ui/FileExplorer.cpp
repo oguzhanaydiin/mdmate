@@ -13,8 +13,8 @@
 #include "../core/AppState.h"
 #include "../core/Constants.h"
 #include "../core/Session.h"
-#include "DocumentActions.h"
 #include "MainWindow.h"
+#include "Tabs.h"
 #include "Theme.h"
 
 namespace mdmate {
@@ -133,10 +133,6 @@ std::wstring NormalizePath(std::wstring path) {
         path.pop_back();
     }
     return path;
-}
-
-bool PathsEqual(const std::wstring& a, const std::wstring& b) {
-    return NormalizePath(a) == NormalizePath(b);
 }
 
 bool IsPathUnderFolder(const std::wstring& filePath, const std::wstring& folderPath) {
@@ -463,13 +459,7 @@ LRESULT HandleFileExplorerNotify(HWND window, LPARAM lParam) {
         const auto* sel = reinterpret_cast<const NMTREEVIEWW*>(lParam);
         auto* data = reinterpret_cast<NodeData*>(sel->itemNew.lParam);
         if (data != nullptr && !data->isDirectory) {
-            if (PathsEqual(data->fullPath, g_currentFilePath)) {
-                return 0;
-            }
-            if (!MaybeSavePendingChanges(window)) {
-                return 0;
-            }
-            LoadDocumentIntoEditor(window, data->fullPath);
+            OpenPathInTab(window, data->fullPath);
         }
         return 0;
     }
