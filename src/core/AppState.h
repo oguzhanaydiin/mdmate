@@ -3,6 +3,7 @@
 #include <windows.h>
 
 #include <string>
+#include <vector>
 
 namespace mdmate {
 
@@ -41,5 +42,16 @@ extern bool g_isDraggingFileTreeSplitter;
 extern int g_fileTreeWidth;
 extern bool g_showFileTree;
 extern std::wstring g_currentFolderPath;
+
+struct DocumentTab {
+    std::wstring path;
+    std::wstring text;
+    bool dirty = false;
+    RECT rect{};
+    RECT closeRect{};
+};
+
+extern std::vector<DocumentTab> g_tabs;
+extern int g_activeTab;
 
 }

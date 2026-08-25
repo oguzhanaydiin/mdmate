@@ -1,12 +1,14 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 namespace mdmate {
 
 struct SessionPaths {
-    std::wstring file;
     std::wstring folder;
+    std::vector<std::wstring> files;
+    int active = 0;
 };
 
 // Writes the current file and folder paths to a tiny LocalAppData ini.

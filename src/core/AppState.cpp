@@ -2,6 +2,9 @@
 
 #include "Constants.h"
 
+#include <string>
+#include <vector>
+
 namespace mdmate {
 
 HINSTANCE g_instance = nullptr;
@@ -39,5 +42,8 @@ bool g_isDraggingFileTreeSplitter = false;
 int g_fileTreeWidth = kDefaultFileTreeWidth;
 bool g_showFileTree = true;
 std::wstring g_currentFolderPath;
+
+std::vector<DocumentTab> g_tabs;
+int g_activeTab = -1;
 
 }
