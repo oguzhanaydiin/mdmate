@@ -8,6 +8,7 @@
 #include "core/Constants.h"
 #include "ui/MainWindow.h"
 #include "ui/Splitter.h"
+#include "../resource.h"
 
 using namespace mdmate;
 
@@ -32,8 +33,18 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int commandShow) {
     windowClass.lpfnWndProc = WindowProc;
     windowClass.hInstance = instance;
     windowClass.hCursor = LoadCursorW(nullptr, IDC_ARROW);
-    windowClass.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
-    windowClass.hIconSm = LoadIconW(nullptr, IDI_APPLICATION);
+    windowClass.hIcon = static_cast<HICON>(LoadImageW(
+        instance, MAKEINTRESOURCEW(IDI_APPICON), IMAGE_ICON,
+        GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON), 0));
+    windowClass.hIconSm = static_cast<HICON>(LoadImageW(
+        instance, MAKEINTRESOURCEW(IDI_APPICON), IMAGE_ICON,
+        GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), 0));
+    if (windowClass.hIcon == nullptr) {
+        windowClass.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+    }
+    if (windowClass.hIconSm == nullptr) {
+        windowClass.hIconSm = LoadIconW(nullptr, IDI_APPLICATION);
+    }
     windowClass.hbrBackground = nullptr;
     windowClass.lpszClassName = kWindowClassName;
 
