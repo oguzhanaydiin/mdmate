@@ -4,7 +4,9 @@ Super lightweight, Windows 11–native Markdown editor. One file, no installer.
 
 ## Download
 
-Get **MDMate.exe** from the [latest release](https://github.com/oguzhanaydiin/mdmate/releases/latest).
+**MDMate 1.0** is the build to run: [MDMate-1.0.0.exe](https://github.com/oguzhanaydiin/mdmate/releases/download/v1.0.0/MDMate-1.0.0.exe)
+
+The same file is in the repo at [`dist/MDMate-1.0.0.exe`](dist/MDMate-1.0.0.exe). `bin/` and `obj/` are only local Visual Studio output and stay out of git.
 
 Windows 11. Open the exe and write. Last files and folder come back next time (`%LOCALAPPDATA%\MDMate`). Windows may warn because the file is not signed; you can still run it.
 
@@ -46,4 +48,4 @@ Run:
 .\bin\Release\MDMate.exe
 ```
 
-Ship only `MDMate.exe`. Do not ship `MDMate.pdb`.
+When you ship a build, copy it to `dist/` as `MDMate-x.y.z.exe`. Do not commit `bin/`, `obj/`, or `MDMate.pdb`.

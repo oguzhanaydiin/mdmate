@@ -1,4 +1,4 @@
-# Build output
+# Local build output. The shipped exe is dist/MDMate-1.0.0.exe, not these folders.
 bin/
 obj/
 
